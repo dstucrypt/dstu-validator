@@ -135,13 +135,30 @@ out_0:
 int sign_verify(X509 *x, const unsigned char *buf, const size_t blen,
                          const unsigned char *sign, const size_t slen)
 {
-    int err, ok;
+    int err, ok, raw_slen;
+    BIO *bio, *b64;
     const EVP_MD *md;
+    unsigned char *raw_sign;
     EVP_MD_CTX *mdctx;
     EVP_PKEY *pkey = NULL;
 
+    raw_slen = slen * 3 / 4;
+    raw_sign = OPENSSL_malloc(raw_slen);
+    bio = BIO_new_mem_buf((void*)sign, slen);
+    b64 = BIO_new(BIO_f_base64());
+
+    if(!bio || !b64 | !raw_sign) {
+        err = -12;
+        goto out;
+    }
+
+    bio = BIO_push(b64, bio);
+    BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+    raw_slen = BIO_read(bio, raw_sign, raw_slen);
+
+    BIO_free_all(bio);
+
     md = EVP_get_digestbyname("dstu34311");
-    fprintf(stderr, "md %p\n", md);
     if(md == NULL) {
         err = -1;
         goto out;
@@ -157,7 +174,7 @@ int sign_verify(X509 *x, const unsigned char *buf, const size_t blen,
 
     EVP_VerifyInit_ex(mdctx, md, NULL);
     EVP_VerifyUpdate(mdctx, buf, blen);
-    ok = EVP_VerifyFinal(mdctx, sign, slen, pkey);
+    ok = EVP_VerifyFinal(mdctx, raw_sign, raw_slen, pkey);
     if(ok == 1) {
         err = 0;
     } else {
@@ -167,15 +184,98 @@ int sign_verify(X509 *x, const unsigned char *buf, const size_t blen,
     EVP_MD_CTX_destroy(mdctx);
 
 out:
+    if(raw_sign) {
+        OPENSSL_free(raw_sign);
+    }
+    return err;
+}
+
+int parse_args(const unsigned char *buf, const size_t blen,
+               char **cert, int *cert_len,
+               char **data, int *data_len,
+               char **sign, int *sign_len)
+{
+    int err, chunk, in_data;
+    char c, *end, *cur;
+
+    cur = (char*)buf;
+    end = cur + blen;
+    chunk = 0;
+    in_data = 0;
+    c = '\0';
+
+    while(cur < end) {
+        switch(*cur) {
+        case '&':
+            in_data = 0;
+            switch(c) {
+            case 'c': *cert_len = chunk; break;
+            case 'd': *data_len = chunk; break;
+            case 's': *sign_len = chunk; break;
+            }
+            c = '\0';
+            break;
+        case '=':
+            if(c != '\0' && in_data == 0) {
+                in_data = 1;
+                chunk = -1;
+            }
+            break;
+        case 'c':
+        case 'd':
+        case 's':
+            if(in_data==0) {
+                c = *cur;
+            }
+        }
+
+        if(chunk == 0) {
+        switch(c) {
+        case 'c': *cert = cur; break;
+        case 'd': *data = cur; break;
+        case 's': *sign = cur; break;
+
+        }
+        }
+
+        chunk++;
+        cur++;
+    }
+    switch(c) {
+        case 'c': *cert_len = chunk; break;
+        case 'd': *data_len = chunk; break;
+        case 's': *sign_len = chunk; break;
+    }
+
+    if(*cert && *cert_len && *data && *data_len && *sign && *sign_len) {
+        err = 0;
+    } else {
+        err = -22;
+    }
+out:
     return err;
 }
 
 int app_handle(const char *path, const unsigned char *buf, const size_t blen,
                                  unsigned char **ret, size_t *rlen) {
     int err, idx;
+    char *cert = NULL, *data = NULL, *sign = NULL;
+    int cert_len = 0, data_len = 0, sign_len = 0;
 
     X509 *x = NULL;
-    x = verify_cert(buf, blen);
+
+    err = parse_args(buf, blen, &cert, &cert_len, &data, &data_len,
+                                                  &sign, &sign_len);
+
+    if(err != 0) {
+        *ret = malloc(4);
+        *rlen = 4;
+        err = 0;
+        memcpy(*ret, "ERR0", 4);
+        goto out;
+    }
+
+    x = verify_cert((unsigned char*)cert, cert_len);
 
     *ret = malloc(4);
     *rlen = 4;
@@ -185,24 +285,13 @@ int app_handle(const char *path, const unsigned char *buf, const size_t blen,
         goto out;
     }
 
-    const char dat[] = "http://enodev.org";
-    const unsigned char sigbuf[] = {
-        0x04, 0x40,
-
-        0x99, 0x3a, 0x43, 0xad, 0x9d, 0x9c, 0x8b, 0x15, 0xf9, 0x3b, 0x9e, 0x6d, 0xb4, 0x88, 0xc6, 0x79, 0xdc, 0x89, 0xba, 0x77, 0xdd, 0xcd, 0xf8, 0x0, 0x6d, 0x55, 0x45, 0x2a, 0x23, 0x44, 0x2c, 0x3a,
-
-        0x1, 0xc8, 0x3f, 0x2f, 0x92, 0x93, 0x2a, 0x95, 0x1e, 0x96, 0x2f, 0x65, 0x99, 0x5d, 0x14, 0x6a, 0x18, 0x48, 0x1a, 0x6e, 0x16, 0xa7, 0xcc, 0x43, 0xa3, 0x57, 0x8d, 0x19, 0x8, 0xee, 0xf4, 0x20
-
-    };
-
-    err = sign_verify(x, (const unsigned char *)dat, sizeof(dat) - 1, sigbuf, 66);
+    err = sign_verify(x, (unsigned char*)data, data_len,
+                         (unsigned char*)sign, sign_len);
     if(err != 0) {
         memcpy(*ret, "ERR2", 4);
         err = 0;
         goto out1;
     }
-
-    fprintf(stderr, "pk ctx %d\n", err);
 
     memcpy(*ret, "YEPL", 4);
 
