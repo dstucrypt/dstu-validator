@@ -266,7 +266,7 @@ int main(int argc, char *argv[])
     }
 
     if(argc == 1) {
-        bind = "0.0.0.0:8013";
+        bind = "127.0.0.1:8013";
     } else {
         bind = argv[1];
     }
