@@ -330,7 +330,7 @@ out:
 int app_handle(const char *path, const unsigned char *buf, const size_t blen,
                                  unsigned char **ret, size_t *rlen) {
     int err, idx;
-    char *cert = NULL, *data = NULL, *sign = NULL;
+    char *cert = NULL, *data = NULL, *sign = NULL, errs[4];
     int cert_len = 0, data_len = 0, sign_len = 0;
 
     X509 *x = NULL;
@@ -338,33 +338,22 @@ int app_handle(const char *path, const unsigned char *buf, const size_t blen,
     err = parse_args(buf, blen, &cert, &cert_len, &data, &data_len,
                                                   &sign, &sign_len);
 
+    #define E(a) {memcpy(errs, a, 4); goto send_err;}
+
     if(err != 0) {
-        *ret = malloc(4);
-        *rlen = 4;
-        err = 0;
-        memcpy(*ret, "ERR0", 4);
-        goto out;
+        E("EARG");
     }
 
     x = verify_cert((unsigned char*)cert, cert_len);
-
-    *ret = malloc(4);
-    *rlen = 4;
-
     if (x == NULL) {
-        memcpy(*ret, "ERR1", 4);
-        goto out;
+        E("ECRT");
     }
 
     err = sign_verify(x, (unsigned char*)data, data_len,
                          (unsigned char*)sign, sign_len);
     if(err != 0) {
-        memcpy(*ret, "ERR2", 4);
-        err = 0;
-        goto out1;
+        E("ESGN");
     }
-
-    memcpy(*ret, "YEPL", 4);
 
     err = dump_cert(x, ret, rlen);
 
@@ -373,4 +362,13 @@ out1:
 
 out:
     return err;
+
+send_err:
+    if(x) {
+        X509_free(x);
+    }
+    *ret = malloc(sizeof(errs));
+    *rlen = sizeof(errs);
+    memcpy(*ret, errs, sizeof(errs));
+    return 1;
 }

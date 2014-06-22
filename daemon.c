@@ -162,14 +162,18 @@ int http_end(struct http_request* http_request) {
     mb = &http_request->data;
     mb->pos = 0;
     err = app_handle("verify", mbuf_buf(mb), mbuf_get_left(mb), &ret_buf, &ret_len);
-    if(err != 0) {
+    if(err < 0) {
         http_abort(http_request, 500);
         return 1;
     }
 
     ret = &http_request->ret;
     mbuf_init(ret);
-    set_response(ret, 200, "OK", ret_buf, ret_len);
+    if(err == 0) {
+        set_response(ret, 200, "OK", ret_buf, ret_len);
+    } else {
+        set_response(ret, 403, "Forbidden", ret_buf, ret_len);
+    }
     mbuf_set_pos(ret, 0);
     tcp_send(http_request->conn, ret);
 
