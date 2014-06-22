@@ -7,6 +7,8 @@
 #include <openssl/crypto.h>
 #include <openssl/bio.h>
 #include <openssl/pem.h>
+#include <openssl/x509v3.h>
+#include "app_asn1.h"
 
 #define HEADER_CRYPTLIB_H
 #include <openssl/opensslconf.h>
@@ -190,6 +192,75 @@ out:
     return err;
 }
 
+int dump_cert(X509 *x, unsigned char **ret, size_t *rlen) {
+    int err;
+    int flags;
+    X509_CINF *ci;
+    BIO *bio_ret;
+    STACK_OF(X509_EXTENSION) *exts;
+    TAX_NUMBERS *numbers;
+    X509_EXTENSION *ex;
+    ASN1_OBJECT *obj, *ipn;
+
+    flags = XN_FLAG_SEP_MULTILINE | ASN1_STRFLGS_UTF8_CONVERT;
+
+    ci = x->cert_info;
+    exts = ci->extensions;
+
+    bio_ret = BIO_new(BIO_s_mem());
+
+    X509_NAME_print_ex(bio_ret, X509_get_subject_name(x), 0,
+            XN_FLAG_SEP_MULTILINE | ASN1_STRFLGS_UTF8_CONVERT
+    );
+    BIO_puts(bio_ret, "\n");
+
+    int i, j, len;
+    char oid[50];
+    unsigned char *buf_numbers = NULL;
+    ipn = obj = OBJ_txt2obj("2.5.29.9", 0);
+    for (i=0; i<sk_X509_EXTENSION_num(exts); i++) {
+        X509_EXTENSION *ex;
+        ex=sk_X509_EXTENSION_value(exts, i);
+        obj=X509_EXTENSION_get_object(ex);
+        if(OBJ_cmp(obj, ipn) == 0) {
+            OBJ_obj2txt(oid, 50, obj, 1);
+
+            buf_numbers = malloc(ex->value->length);
+            memcpy(buf_numbers, ex->value->data, ex->value->length);
+            numbers = d2i_TAX_NUMBERS(NULL, (const unsigned char **)&buf_numbers, ex->value->length);
+
+            for(j=0; j<sk_TAX_NUMBER_num(numbers); j++) {
+                TAX_NUMBER *tn;
+                ASN1_PRINTABLESTRING *ps;
+                tn = sk_TAX_NUMBER_value(numbers, j);
+                ps = sk_PS_value(tn->value, 0);
+                memset(oid, 0, 50);
+                OBJ_obj2txt(oid, 50, tn->object, 0);
+
+                BIO_printf(bio_ret, "%s=", oid);
+                ASN1_STRING_print(bio_ret, ps);
+                BIO_puts(bio_ret, "\n");
+
+            }
+
+            TAX_NUMBERS_free(numbers);
+        }
+    }
+
+    len = BIO_ctrl_pending(bio_ret);
+    *ret = malloc(len);
+    *rlen = BIO_read(bio_ret, *ret, len);
+    if(len == *rlen) {
+        err = 0;
+    } else {
+        err = -22;
+        free(*ret);
+        *rlen = 0;
+        *ret = NULL;
+    }
+    return err;
+}
+
 int parse_args(const unsigned char *buf, const size_t blen,
                char **cert, int *cert_len,
                char **data, int *data_len,
@@ -295,7 +366,7 @@ int app_handle(const char *path, const unsigned char *buf, const size_t blen,
 
     memcpy(*ret, "YEPL", 4);
 
-    err = 0;
+    err = dump_cert(x, ret, rlen);
 
 out1:
     X509_free(x);

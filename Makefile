@@ -4,7 +4,7 @@ INCS=-I$(RE)/include -I/usr/local/ssl/include
 LIBS=-L$(RE) -lre -L/usr/local/ssl/lib -lcrypto
 CFLAGS=-DHAVE_INET6
 
-OBJS=app.o daemon.o
+OBJS=app.o daemon.o asn1.o
 
 %.o: %.c
 	cc $< -o $@ -c $(INCS) $(CFLAGS) -g
