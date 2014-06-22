@@ -25,6 +25,10 @@ int SSL_library_init(void)
     ERR_load_crypto_strings();
     ENGINE_load_builtin_engines(); 
 
+    e = ENGINE_by_id("dstu");
+    if(e)
+        return(0);
+
     e = ENGINE_by_id("dynamic");
 
     ok = ENGINE_ctrl_cmd_string(e, "SO_PATH", "dstu", 0);
