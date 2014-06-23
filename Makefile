@@ -1,13 +1,27 @@
-RE=../libre
+OS=$(shell uname -s)
 
-INCS=-I$(RE)/include -I/usr/local/ssl/include
-LIBS=-L$(RE) -lre -L/usr/local/ssl/lib -lcrypto
+ifeq ($(OS),Linux)
+RE_INC=/usr/include/re
+RE_LIB=/usr/lib
+else
+RE_INC=../libre/include
+RE_LIB=../libre
+endif
+
+SSL=/usr/local/ssl
+
+INCS=-I$(SSL)/include -I$(RE_INC)
+LIBS=\
+	-Wl,-rpath=$(SSL)/lib \
+	-L$(SSL)/lib -lcrypto \
+	-L$(RE_LIB) -lre
+
 CFLAGS=-DHAVE_INET6
 
 OBJS=app.o daemon.o asn1.o
 
 %.o: %.c
-	cc $< -o $@ -c $(INCS) $(CFLAGS) -g
+	cc $< -o $@ -c $(INCS) $(CFLAGS)
 
 authd: $(OBJS)
-	cc $(OBJS) -o $@ $(LIBS) -g
+	cc $(OBJS) -o $@ $(LIBS)
