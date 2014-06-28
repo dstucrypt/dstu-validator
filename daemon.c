@@ -234,7 +234,7 @@ void http_recv(struct mbuf *mb, void *arg) {
     http_end(http_request);
 }
 
-void http_request(const struct sa *peer, void *arg) {
+void http_accept(const struct sa *peer, void *arg) {
 
     struct http_request *ctx;
     struct httpd *httpd = arg;
@@ -250,7 +250,7 @@ int prepare(struct httpd *httpd, const char *to_bind) {
     err = sa_decode(&local_addr, to_bind, strlen(to_bind));
     if(err != 0)
         return err;
-    err = tcp_listen(&httpd->tsp, &local_addr, http_request, httpd);
+    err = tcp_listen(&httpd->tsp, &local_addr, http_accept, httpd);
     return err;
 }
 
