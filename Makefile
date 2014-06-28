@@ -3,6 +3,7 @@ OS=$(shell uname -s)
 ifeq ($(OS),Linux)
 RE_INC=/usr/include/re
 RE_LIB=/usr/lib
+LFLAGS+=-Wl,-rpath=$(SSL)/lib
 else
 RE_INC=../libre/include
 RE_LIB=../libre
@@ -12,7 +13,6 @@ SSL=/usr/local/ssl
 
 INCS=-I$(SSL)/include -I$(RE_INC)
 LIBS=\
-	-Wl,-rpath=$(SSL)/lib \
 	-L$(SSL)/lib -lcrypto \
 	-L$(RE_LIB) -lre
 
@@ -24,4 +24,4 @@ OBJS=app.o daemon.o asn1.o
 	cc $< -o $@ -c $(INCS) $(CFLAGS)
 
 authd: $(OBJS)
-	cc $(OBJS) -o $@ $(LIBS)
+	cc $(OBJS) -o $@ $(LIBS) $(LFLAGS)
