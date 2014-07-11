@@ -9,19 +9,31 @@ RE_INC=../libre/include
 RE_LIB=../libre
 endif
 
+ifeq ($(CC),)
+CC=cc
+endif
+
 SSL=/usr/local/ssl
 
+ifeq ($(BUILD),system)
+LIBS=-lcrypto -lre
+INCS=-I$(RE_INC)
+else
 INCS=-I$(SSL)/include -I$(RE_INC)
 LIBS=\
 	-L$(SSL)/lib -lcrypto \
 	-L$(RE_LIB) -lre
+endif
 
-CFLAGS=-DHAVE_INET6
+CFLAGS+=-DHAVE_INET6
 
 OBJS=app.o daemon.o asn1.o
 
 %.o: %.c
-	cc $< -o $@ -c $(INCS) $(CFLAGS)
+	$(CC) $< -o $@ -c $(INCS) $(CFLAGS)
 
 authd: $(OBJS)
-	cc $(OBJS) -o $@ $(LIBS) $(LFLAGS)
+	$(CC) $(OBJS) -o $@ $(LIBS) $(LDFLAGS)
+
+clean:
+	rm -f $(OBJS) authd
