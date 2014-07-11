@@ -1,0 +1,10 @@
+# DSTUD - Signature check daemon
+description     "DSTU4145 Daemon"
+
+start on runlevel [2345]
+stop on runlevel [!2345]
+
+respawn
+
+chdir /etc/dstu
+exec start-stop-daemon --chuid nobody --start --exec /usr/bin/dstud

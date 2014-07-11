@@ -1,0 +1,11 @@
+dstud (0.2ubuntu6) precise; urgency=low
+
+  * Init script for dstu daemon
+
+ -- Ilya Petrov <ilya.muromec@gmail.com>  Tue, 24 Jun 2014 16:15:30 +0300
+
+dstud (0.2ubuntu5) precise; urgency=low
+
+  * Initial release.
+
+ -- Ilya Petrov <ilya.muromec@gmail.com>  Tue, 24 Jun 2014 04:24:39 +0300
