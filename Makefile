@@ -13,16 +13,23 @@ ifeq ($(CC),)
 CC=cc
 endif
 
-SSL=/usr/local/ssl
 
 ifeq ($(BUILD),system)
 LIBS=-lcrypto -lre
 INCS=-I$(RE_INC)
+LIBS_STATIC=\
+    $(LIB_PREFIX)/libcrypto.a \
+    /usr/lib/libre.a \
+    -ldl -lz -lpthread -lc
 else
+SSL=/usr/local/ssl
 INCS=-I$(SSL)/include -I$(RE_INC)
 LIBS=\
 	-L$(SSL)/lib -lcrypto \
 	-L$(RE_LIB) -lre
+LIBS_STATIC=\
+    $(SSL)/lib/libcrypto.a \
+    $(RE_LIB)/libre.a
 endif
 
 CFLAGS+=-DHAVE_INET6
@@ -34,6 +41,9 @@ OBJS=app.o daemon.o asn1.o
 
 authd: $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LIBS) $(LDFLAGS)
+
+authd-static: $(OBJS)
+	$(CC) $(OBJS) -o $@ $(LIBS_STATIC) $(LDFLAGS)
 
 clean:
 	rm -f $(OBJS) authd
