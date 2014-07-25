@@ -5,7 +5,6 @@
 #include "app.h"
 
 struct httpd {
-    int port;
     struct http_sock *hsp;
 };
 
@@ -57,7 +56,6 @@ int main(int argc, char *argv[])
     int err;
     struct httpd httpd;
     char *bind;
-    httpd.port = 8013;
 
     err = libre_init();
     if(err != 0) {
