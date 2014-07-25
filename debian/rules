@@ -4,12 +4,20 @@
 #export DH_OPTIONS=-v
 
 DEB_HOST_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE 2>/dev/null)
-MAKEFLAGS=BUILD=system CC=$(DEB_HOST_GNU_TYPE)-gcc
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_BUILD_MULTIARCH 2>/dev/null)
+
+MAKEFLAGS=BUILD=system \
+          CC=$(DEB_HOST_GNU_TYPE)-gcc \
+          LIB_PREFIX=/usr/lib/$(DEB_HOST_MULTIARCH)
 
 %:
 	dh $@
 
+override_dh_auto_build:
+	make authd authd-static
+
 override_dh_auto_install:
 	cp ./authd `pwd`/debian/dstud/usr/bin/dstud
-	cp ./CA/* `pwd`/debian/dstud/etc/dstu/CA/
+	cp ./authd-static `pwd`/debian/dstud-static/usr/bin/dstud
 	cp ./debian/upstart-dstud `pwd`/debian/dstud/etc/init/dstud.conf
+	cp ./debian/upstart-dstud `pwd`/debian/dstud-static/etc/init/dstud.conf

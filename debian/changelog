@@ -1,3 +1,21 @@
+dstud (0.2ubuntu13~saucy) saucy; urgency=low
+
+  * Fix initscript for upstart
+
+ -- Ilya Petrov <ilya.muromec@gmail.com>  Mon, 21 Jul 2014 02:34:00 +0300
+
+dstud (0.2ubuntu12) precise; urgency=low
+
+  * Fix packaging paths
+
+ -- Ilya Petrov <ilya.muromec@gmail.com>  Sun, 20 Jul 2014 08:01:29 +0300
+
+dstud (0.2ubuntu11) precise; urgency=low
+
+  * Add static packages, update initscript (don't run as root)
+
+ -- Ilya Petrov <ilya.muromec@gmail.com>  Fri, 11 Jul 2014 22:39:26 +0300
+
 dstud (0.2ubuntu6) precise; urgency=low
 
   * Init script for dstu daemon
