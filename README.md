@@ -21,6 +21,11 @@ Params:
 - `s` - signature in base64
 - `c` - signer certificate in PEM format
 
+Dependencies
+------------
+
+Depends on openssl-dstu and creytib re 0.4.9
+
 Links
 -----
 

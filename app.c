@@ -334,7 +334,7 @@ out:
 int app_handle(const char *path, const unsigned char *buf, const size_t blen,
                                  unsigned char **ret, size_t *rlen) {
     int err, idx;
-    char *cert = NULL, *data = NULL, *sign = NULL, errs[4];
+    char *cert = NULL, *data = NULL, *sign = NULL, errs[5];
     int cert_len = 0, data_len = 0, sign_len = 0;
 
     X509 *x = NULL;
@@ -374,5 +374,6 @@ send_err:
     *ret = malloc(sizeof(errs));
     *rlen = sizeof(errs);
     memcpy(*ret, errs, sizeof(errs));
+    ret[4] = 0;
     return 1;
 }
