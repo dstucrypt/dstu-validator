@@ -33,9 +33,9 @@ void http_request_h(struct http_conn *conn, const struct http_msg *msg, void *ar
     }
 
     if(err == 0) {
-        http_creply(conn, 200, "OK", "text/plain", "%s", ret_buf);
+        http_creply(conn, 200, "OK", "text/plain; charset=utf-8", "%b", ret_buf, ret_len);
     } else {
-        http_creply(conn, 403, "Forbidden", "text/plain", "%s", ret_buf);
+        http_creply(conn, 403, "Forbidden", "text/plain", "%b", ret_buf, ret_len);
     }
 
     free(ret_buf);
