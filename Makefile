@@ -50,4 +50,4 @@ authd-static: $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LIBS_STATIC) $(LDFLAGS)
 
 clean:
-	rm -f $(OBJS) authd
+	rm -f $(OBJS) authd authd-static
