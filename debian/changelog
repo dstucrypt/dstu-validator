@@ -1,3 +1,9 @@
+dstud (0.3ubuntu0~precise) precise; urgency=low
+
+  * Port to new version of creytiv libre and use builtin http server
+
+ -- Ilya Petrov <ilya.muromec@gmail.com>  Sat, 26 Jul 2014 02:54:26 +0300
+
 dstud (0.2ubuntu13~saucy) saucy; urgency=low
 
   * Fix initscript for upstart

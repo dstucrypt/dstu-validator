@@ -3,11 +3,11 @@ Maintainer: Ilya Petrov <ilya.muromec@gmail.com>
 Section: misc
 Priority: optional
 Standards-Version: 3.9.2
-Build-Depends: debhelper (>= 9), libssl-dev, libre-dev
+Build-Depends: debhelper (>= 9), libssl-dev, libre-dev (>= 0.4.9)
 
 Package: dstud
 Architecture: amd64 i386
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: libre (>= 0.4.9), ${shlibs:Depends}, ${misc:Depends}
 Description: DSTU4145 certifiacte and sign validator as HTTP API
  Enables apps to validate DSTU signature without burden of linking to OpenSSL
 
