@@ -17,6 +17,7 @@ static void signal_handler(int sig)
 void http_request_h(struct http_conn *conn, const struct http_msg *msg, void *arg)
 {
     int err;
+    enum app_cmd cmd;
     struct mbuf *mb = msg->mb;
     uint8_t *ret_buf;
     size_t ret_len;
@@ -26,9 +27,15 @@ void http_request_h(struct http_conn *conn, const struct http_msg *msg, void *ar
         return;
     }
 
-    err = app_handle("verify", mbuf_buf(mb), mbuf_get_left(mb), &ret_buf, &ret_len);
+    cmd = (enum app_cmd)(hash_joaat_ci(msg->path.p, msg->path.l) & 0xfff);
+    err = app_handle(cmd, mbuf_buf(mb), mbuf_get_left(mb), &ret_buf, &ret_len);
     if(err < 0) {
         http_creply(conn, 500, "Internal Server Error", "text/plain", "EINT");
+        return;
+    }
+
+    if(err > 200) {
+        http_creply(conn, err, "Error", "text/plain", "NO", 2);
         return;
     }
 

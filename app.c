@@ -8,6 +8,7 @@
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
+#include "app.h"
 #include "app_asn1.h"
 
 #define HEADER_CRYPTLIB_H
@@ -251,6 +252,13 @@ int dump_cert(X509 *x, unsigned char **ret, size_t *rlen) {
         }
     }
 
+    BIO_printf(bio_ret, "NOT_BEFORE=");
+    ASN1_TIME_print(bio_ret, X509_get_notBefore(x));
+
+    BIO_printf(bio_ret, "\nNOT_AFTER=");
+    ASN1_TIME_print(bio_ret, X509_get_notAfter(x));
+    BIO_puts(bio_ret, "\n");
+
     len = BIO_ctrl_pending(bio_ret);
     *ret = malloc(len);
     *rlen = BIO_read(bio_ret, *ret, len);
@@ -331,8 +339,11 @@ out:
     return err;
 }
 
-int app_handle(const char *path, const unsigned char *buf, const size_t blen,
-                                 unsigned char **ret, size_t *rlen) {
+#define E(a) {memcpy(errs, a, 4); goto send_err;}
+
+int verify_handle(const unsigned char *buf, const size_t blen,
+                  unsigned char **ret, size_t *rlen)
+{
     int err, idx;
     char *cert = NULL, *data = NULL, *sign = NULL, errs[4];
     int cert_len = 0, data_len = 0, sign_len = 0;
@@ -342,7 +353,6 @@ int app_handle(const char *path, const unsigned char *buf, const size_t blen,
     err = parse_args(buf, blen, &cert, &cert_len, &data, &data_len,
                                                   &sign, &sign_len);
 
-    #define E(a) {memcpy(errs, a, 4); goto send_err;}
 
     if(err != 0) {
         E("EARG");
@@ -376,3 +386,48 @@ send_err:
     memcpy(*ret, errs, sizeof(errs));
     return 1;
 }
+
+int x509_handle(const unsigned char *buf, const size_t blen,
+                  unsigned char **ret, size_t *rlen)
+{
+    int err;
+    char errs[4];
+
+    X509 *x = NULL;
+    x = verify_cert((unsigned char*)buf, blen);
+    if (x == NULL) {
+        E("ECRT");
+    }
+    err = dump_cert(x, ret, rlen);
+
+out1:
+    X509_free(x);
+
+out:
+    return err;
+
+send_err:
+    if(x) {
+        X509_free(x);
+    }
+    *ret = malloc(sizeof(errs));
+    *rlen = sizeof(errs);
+    memcpy(*ret, errs, sizeof(errs));
+    return 1;
+
+}
+
+int app_handle(enum app_cmd cmd, const unsigned char *buf, const size_t blen,
+                                 unsigned char **ret, size_t *rlen) {
+
+    switch(cmd) {
+    case CMD_VERIFY:
+        return verify_handle(buf, blen, ret, rlen);
+    case CMD_X509:
+        return x509_handle(buf, blen, ret, rlen);
+    default:
+        printf("def ret cmd %x\n", cmd);
+        return 404;
+    }
+
+};
