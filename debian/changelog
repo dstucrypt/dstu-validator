@@ -1,3 +1,10 @@
+dstud (0.4.0ubuntu0~trusty) trusty; urgency=low
+
+  * Api method to verify X509 cert
+  * Output validity times
+
+ -- Ilya Petrov <ilya.muromec@gmail.com>  Mon, 11 Aug 2014 00:25:28 +0300
+
 dstud (0.3.1ubuntu1~precise) precise; urgency=low
 
   * Fix memory issues and codepage
