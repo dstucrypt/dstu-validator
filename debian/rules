@@ -5,10 +5,12 @@
 
 DEB_HOST_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE 2>/dev/null)
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_BUILD_MULTIARCH 2>/dev/null)
+VERSION ?= $(shell head debian/changelog -n1 | sed -E 's/[^0-9]+([0-9.]+).*/\1/')
 
 MAKEFLAGS=BUILD=system \
           CC=$(DEB_HOST_GNU_TYPE)-gcc \
-          LIB_PREFIX=/usr/lib/$(DEB_HOST_MULTIARCH)
+          LIB_PREFIX=/usr/lib/$(DEB_HOST_MULTIARCH) \
+          DSTUD_VERSION=$(VERSION)
 
 %:
 	dh $@
