@@ -34,6 +34,10 @@ endif
 
 CFLAGS+=-DHAVE_INET6
 
+ifneq ($(DSTUD_VERSION),)
+CFLAGS+=-DDSTUD_VERSION=\"$(DSTUD_VERSION)\"
+endif
+
 OBJS=app.o daemon.o asn1.o
 
 %.o: %.c

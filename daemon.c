@@ -4,6 +4,12 @@
 #include <re.h>
 #include "app.h"
 
+#ifdef DSTUD_VERSION
+static char *version = DSTUD_VERSION;
+#else
+static char *version = NULL;
+#endif
+
 struct httpd {
     struct http_sock *hsp;
 };
@@ -14,16 +20,71 @@ static void signal_handler(int sig)
     re_cancel();
 }
 
+static unsigned int str_ver(char *version) {
+    int shift = 24;
+    unsigned int ret = 0;
+    struct pl ver;
+    char *part = version;
+
+    while(*version) {
+        if(*version == '.') {
+            ver.p = part;
+            ver.l = version - part;
+            ret |= pl_u32(&ver) << shift;
+            shift -= 8;
+            part = version+1;
+        }
+        version ++;
+    }
+
+    ver.p = part;
+    ver.l = version - part;
+    ret |= pl_u32(&ver) << shift;
+    part = version+1;
+
+    return ret;
+};
+
+int version_cmp(char *have, const struct pl *want_pl) {
+    char *hdr = NULL, *want = NULL;
+    unsigned int uhave, uwant;
+
+    if(pl_strdup(&hdr, want_pl)) {
+        return -1;
+    }
+
+    if(strncmp(hdr, "Version=", sizeof("Version=")-1)) {
+        return -1;
+    }
+
+    want = hdr + sizeof("Version=")-1;
+
+    uhave = str_ver(have);
+    uwant = str_ver(want);
+
+out:
+    mem_deref(hdr);
+
+    return uhave - uwant;
+};
+
 void http_request_h(struct http_conn *conn, const struct http_msg *msg, void *arg)
 {
     int err;
     enum app_cmd cmd;
+    const struct http_hdr * expect_hdr;
     struct mbuf *mb = msg->mb;
     uint8_t *ret_buf;
     size_t ret_len;
 
     if(pl_strcmp(&msg->met, "POST")) {
         http_creply(conn, 405, "Method not allowed", "text/plain", "EMET");
+        return;
+    }
+
+    expect_hdr = http_msg_hdr(msg, HTTP_HDR_EXPECT);
+    if(expect_hdr != NULL && version_cmp(version, &expect_hdr->val) < 0) {
+        http_creply(conn, 417, "Expectation Failed", "text/plain", "%s", version);
         return;
     }
 
