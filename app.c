@@ -15,7 +15,7 @@
 #include <openssl/opensslconf.h>
 #undef HEADER_CRYPTLIB_H
 
-int SSL_library_init(void)
+static int SSL_library_init(void)
 {
     int ok;
 
@@ -39,7 +39,7 @@ int SSL_library_init(void)
     }
     ok = ENGINE_ctrl_cmd_string(e, "LOAD", NULL, 0);
     if(ok != 1) {
-        fprintf(stderr, "Unable to laod engine\n");
+        fprintf(stderr, "Unable to load engine\n");
         return -1;
     }
 
