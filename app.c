@@ -206,7 +206,7 @@ int dump_cert(X509 *x, unsigned char **ret, size_t *rlen) {
     STACK_OF(X509_EXTENSION) *exts;
     TAX_NUMBERS *numbers;
     X509_EXTENSION *ex;
-    ASN1_OBJECT *obj, *ipn;
+    ASN1_OBJECT *obj;
 
     flags = XN_FLAG_SEP_MULTILINE | ASN1_STRFLGS_UTF8_CONVERT;
 
@@ -221,36 +221,44 @@ int dump_cert(X509 *x, unsigned char **ret, size_t *rlen) {
     BIO_puts(bio_ret, "\n");
 
     int i, j, len;
+    unsigned char *buf_numbers = NULL, *_bn = NULL;
     char oid[50];
-    unsigned char *buf_numbers = NULL;
-    ipn = obj = OBJ_txt2obj("2.5.29.9", 0);
-    for (i=0; i<sk_X509_EXTENSION_num(exts); i++) {
+    i = X509v3_get_ext_by_NID(exts, NID_subject_directory_attributes, -1);
+
+    if(i >= 0) {
         X509_EXTENSION *ex;
-        ex=sk_X509_EXTENSION_value(exts, i);
+        ex = X509v3_get_ext(exts, i);
         obj=X509_EXTENSION_get_object(ex);
-        if(OBJ_cmp(obj, ipn) == 0) {
-            OBJ_obj2txt(oid, 50, obj, 1);
 
-            buf_numbers = malloc(ex->value->length);
-            memcpy(buf_numbers, ex->value->data, ex->value->length);
-            numbers = d2i_TAX_NUMBERS(NULL, (const unsigned char **)&buf_numbers, ex->value->length);
+        buf_numbers = malloc(ex->value->length);
+        _bn = buf_numbers;
+        memcpy(buf_numbers, ex->value->data, ex->value->length);
+        numbers = d2i_TAX_NUMBERS(NULL, (const unsigned char **)&buf_numbers, ex->value->length);
 
-            for(j=0; j<sk_TAX_NUMBER_num(numbers); j++) {
-                TAX_NUMBER *tn;
-                ASN1_PRINTABLESTRING *ps;
-                tn = sk_TAX_NUMBER_value(numbers, j);
-                ps = sk_PS_value(tn->value, 0);
-                memset(oid, 0, 50);
-                OBJ_obj2txt(oid, 50, tn->object, 0);
+        for(j=0; j<sk_TAX_NUMBER_num(numbers); j++) {
+            TAX_NUMBER *tn;
+            ASN1_PRINTABLESTRING *ps;
+            tn = sk_TAX_NUMBER_value(numbers, j);
+            ps = sk_PS_value(tn->value, 0);
+            memset(oid, 0, 50);
+            OBJ_obj2txt(oid, 50, tn->object, 0);
 
-                BIO_printf(bio_ret, "%s=", oid);
-                ASN1_STRING_print(bio_ret, ps);
-                BIO_puts(bio_ret, "\n");
+            BIO_printf(bio_ret, "%s=", oid);
+            ASN1_STRING_print(bio_ret, ps);
+            BIO_puts(bio_ret, "\n");
 
-            }
-
-            TAX_NUMBERS_free(numbers);
         }
+
+        TAX_NUMBERS_free(numbers);
+    }
+
+    i = X509v3_get_ext_by_NID(exts, NID_key_usage, -1);
+    if(i >= 0) {
+        X509_EXTENSION *ex;
+        ex = X509v3_get_ext(exts, i);
+        BIO_printf(bio_ret, "USAGE=");
+        X509V3_EXT_print(bio_ret, ex, 0, 0);
+        BIO_puts(bio_ret, "\n");
     }
 
     BIO_printf(bio_ret, "NOT_BEFORE=");
@@ -258,6 +266,9 @@ int dump_cert(X509 *x, unsigned char **ret, size_t *rlen) {
 
     BIO_printf(bio_ret, "\nNOT_AFTER=");
     ASN1_TIME_print(bio_ret, X509_get_notAfter(x));
+
+    BIO_printf(bio_ret, "\nSERIAL=");
+    i2a_ASN1_INTEGER(bio_ret, X509_get_serialNumber(x));
     BIO_puts(bio_ret, "\n");
 
     len = BIO_ctrl_pending(bio_ret);
@@ -271,6 +282,8 @@ int dump_cert(X509 *x, unsigned char **ret, size_t *rlen) {
         *rlen = 0;
         *ret = NULL;
     }
+    if(_bn)
+        free(_bn);
     return err;
 }
 
