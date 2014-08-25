@@ -38,7 +38,7 @@ ifneq ($(DSTUD_VERSION),)
 CFLAGS+=-DDSTUD_VERSION=\"$(DSTUD_VERSION)\"
 endif
 
-OBJS=app.o daemon.o asn1.o
+OBJS=app.o daemon.o asn1.o urldecode.o
 
 %.o: %.c
 	$(CC) $< -o $@ -c $(INCS) $(CFLAGS)

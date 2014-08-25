@@ -11,6 +11,7 @@
 #include <openssl/x509v3.h>
 #include "app.h"
 #include "app_asn1.h"
+#include "urldecode.h"
 
 #define HEADER_CRYPTLIB_H
 #include <openssl/opensslconf.h>
@@ -367,6 +368,7 @@ int verify_handle(const unsigned char *buf, const size_t blen,
     err = parse_args(buf, blen, &cert, &cert_len, &data, &data_len,
                                                   &sign, &sign_len);
 
+    data = url_decode(data, data_len);
 
     if(err != 0) {
         E("EARG");
@@ -387,6 +389,7 @@ int verify_handle(const unsigned char *buf, const size_t blen,
 
 out1:
     X509_free(x);
+    free(data);
 
 out:
     return err;
@@ -394,6 +397,9 @@ out:
 send_err:
     if(x) {
         X509_free(x);
+    }
+    if(data) {
+        free(data);
     }
     *ret = malloc(sizeof(errs));
     *rlen = sizeof(errs);
