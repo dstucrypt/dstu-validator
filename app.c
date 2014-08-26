@@ -368,7 +368,7 @@ int verify_handle(const unsigned char *buf, const size_t blen,
     err = parse_args(buf, blen, &cert, &cert_len, &data, &data_len,
                                                   &sign, &sign_len);
 
-    data = url_decode(data, data_len);
+    data = url_decode(data, data_len, &data_len);
 
     if(err != 0) {
         E("EARG");

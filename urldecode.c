@@ -41,8 +41,8 @@ char *url_encode(char *str) {
 
 /* Returns a url-decoded version of str */
 /* IMPORTANT: be sure to free() the returned string after use */
-char *url_decode(char *str, int slen) {
-  char *pstr = str, *buf = malloc(slen + 1), *pbuf = buf;
+char *url_decode(char *str, int slen, int *rlen) {
+  char *pstr = str, *buf = malloc(slen), *pbuf = buf;
   if (!buf)
     return buf;
   while (slen) {
@@ -60,6 +60,6 @@ char *url_decode(char *str, int slen) {
     pstr++;
     slen--;
   }
-  *pbuf = '\0';
+  *rlen = pbuf - buf;
   return buf;
 }
