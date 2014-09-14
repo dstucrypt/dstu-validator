@@ -1,3 +1,15 @@
+dstud (0.4.5ubuntu1~precise) precise; urgency=low
+
+  * Parse URL encoding
+
+ -- Ilya Petrov <ilya.muromec@gmail.com>  Tue, 26 Aug 2014 02:32:50 +0300
+
+dstud (0.4.3ubuntu0~trusty) trusty; urgency=low
+
+  * Parse serial and key usage from certificate
+
+ -- Ilya Petrov <ilya.muromec@gmail.com>  Tue, 12 Aug 2014 02:35:09 +0300
+
 dstud (0.4.2ubuntu0~trusty) trusty; urgency=low
 
   * Add version expectation check
