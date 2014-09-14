@@ -17,6 +17,12 @@
 #include <openssl/opensslconf.h>
 #undef HEADER_CRYPTLIB_H
 
+typedef struct dstu_key_st
+    {
+    EC_KEY* ec;
+    unsigned char* sbox;
+    } DSTU_KEY;
+
 static int SSL_library_init(void)
 {
     int ok;
@@ -199,6 +205,54 @@ out:
     return err;
 }
 
+void dump_pub(X509 *x, BIO *bio) {
+    BN_CTX *bn_ctx;
+
+    char *pub_cmp = NULL;
+    EVP_PKEY *pkey = NULL;
+    EC_KEY *key = NULL;
+    EC_POINT *pub = NULL;
+    EC_GROUP *ec_group = NULL;
+    pkey = X509_get_pubkey(x);
+    if(pkey == NULL) {
+        goto out;
+    }
+
+    if(pkey->type != NID_dstu4145le) {
+        goto out;
+    }
+
+    key = ((DSTU_KEY*)pkey->pkey.ptr)->ec;
+    if(key == NULL) {
+        goto out;
+    }
+
+    pub = (EC_POINT*)EC_KEY_get0_public_key(key);
+    if(pub == NULL) {
+        goto out;
+    }
+
+    ec_group = (EC_GROUP*)EC_KEY_get0_group(key);
+    if(ec_group == NULL) {
+        goto out;
+    }
+
+    bn_ctx = BN_CTX_new();
+    if(bn_ctx == NULL) {
+        goto out;
+    }
+
+    pub_cmp = EC_POINT_point2hex(ec_group, pub, POINT_CONVERSION_COMPRESSED, bn_ctx);
+    if(pub_cmp == NULL) {
+        goto out;
+    }
+    BIO_printf(bio, "PUB=%s\n", pub_cmp);
+    free(pub_cmp);
+
+out:
+    return;
+}
+
 int dump_cert(X509 *x, unsigned char **ret, size_t *rlen) {
     int err;
     int flags;
@@ -271,6 +325,8 @@ int dump_cert(X509 *x, unsigned char **ret, size_t *rlen) {
     BIO_printf(bio_ret, "\nSERIAL=");
     i2a_ASN1_INTEGER(bio_ret, X509_get_serialNumber(x));
     BIO_puts(bio_ret, "\n");
+
+    dump_pub(x, bio_ret);
 
     len = BIO_ctrl_pending(bio_ret);
     *ret = malloc(len);
