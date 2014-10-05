@@ -477,7 +477,7 @@ int pubverify_handle(const unsigned char *buf, const size_t blen,
         return 400;
     }
 
-    ec_group = group_from_nid(NID_uacurve6);
+    ec_group = group_by_keylen(pub_len / 2);
 
     qpoint = EC_POINT_new(ec_group);
     if(!qpoint) {
