@@ -11,17 +11,13 @@
 #include <openssl/x509v3.h>
 #include "app.h"
 #include "app_asn1.h"
+#include "dstu.h"
 #include "urldecode.h"
 
 #define HEADER_CRYPTLIB_H
 #include <openssl/opensslconf.h>
 #undef HEADER_CRYPTLIB_H
 
-typedef struct dstu_key_st
-    {
-    EC_KEY* ec;
-    unsigned char* sbox;
-    } DSTU_KEY;
 
 static int SSL_library_init(void)
 {
@@ -208,7 +204,8 @@ out:
 void dump_pub(X509 *x, BIO *bio) {
     BN_CTX *bn_ctx;
 
-    char *pub_cmp = NULL;
+    int err, sz, idx;
+    unsigned char *pub_cmp = NULL;
     EVP_PKEY *pkey = NULL;
     EC_KEY *key = NULL;
     EC_POINT *pub = NULL;
@@ -237,16 +234,21 @@ void dump_pub(X509 *x, BIO *bio) {
         goto out;
     }
 
-    bn_ctx = BN_CTX_new();
-    if(bn_ctx == NULL) {
-        goto out;
-    }
-
-    pub_cmp = EC_POINT_point2hex(ec_group, pub, POINT_CONVERSION_COMPRESSED, bn_ctx);
+    sz = (EC_GROUP_get_degree(ec_group) + 7) / 8;
+    pub_cmp = OPENSSL_malloc(sz);
     if(pub_cmp == NULL) {
         goto out;
     }
-    BIO_printf(bio, "PUB=%s\n", pub_cmp);
+
+    err = dstu_point_compress(ec_group, pub, pub_cmp, sz);
+    if(err != 1) {
+        goto out;
+    }
+    BIO_printf(bio, "PUB=");
+    for(idx=0; idx < sz; idx++) {
+        BIO_printf(bio, "%02X", pub_cmp[idx]);
+    }
+    BIO_puts(bio, "\n");
     free(pub_cmp);
 
 out:
