@@ -9,9 +9,11 @@
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
+#include <openssl/asn1.h>
 #include "app.h"
 #include "app_asn1.h"
 #include "dstu.h"
+#include "util.h"
 #include "urldecode.h"
 
 #define HEADER_CRYPTLIB_H
@@ -147,28 +149,16 @@ int sign_verify(X509 *x, const unsigned char *buf, const size_t blen,
                          const unsigned char *sign, const size_t slen)
 {
     int err, ok, raw_slen;
-    BIO *bio, *b64;
     const EVP_MD *md;
-    unsigned char *raw_sign;
+    unsigned char *raw_sign = NULL;
     EVP_MD_CTX *mdctx;
     EVP_PKEY *pkey = NULL;
-
-    raw_slen = slen * 3 / 4;
-    raw_sign = OPENSSL_malloc(raw_slen);
-    bio = BIO_new_mem_buf((void*)sign, slen);
-    b64 = BIO_new(BIO_f_base64());
-
-    if(!bio || !b64 | !raw_sign) {
+    
+    raw_slen = b64_decode(sign, slen, &raw_sign);
+    if(raw_slen < 0) {
         err = -12;
         goto out;
     }
-
-    bio = BIO_push(b64, bio);
-    BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
-    raw_slen = BIO_read(bio, raw_sign, raw_slen);
-
-    BIO_free_all(bio);
-
     md = EVP_get_digestbyname("dstu34311");
     if(md == NULL) {
         err = -1;
@@ -346,12 +336,11 @@ int dump_cert(X509 *x, unsigned char **ret, size_t *rlen) {
     return err;
 }
 
-int parse_args(const unsigned char *buf, const size_t blen,
-               char **cert, int *cert_len,
-               char **data, int *data_len,
-               char **sign, int *sign_len)
+void parse_q_arg(const unsigned char *buf, const size_t blen,
+               char q,
+               char **ret, int *ret_len)
 {
-    int err, chunk, in_data;
+    int chunk, in_data;
     char c, *end, *cur;
 
     cur = (char*)buf;
@@ -364,10 +353,8 @@ int parse_args(const unsigned char *buf, const size_t blen,
         switch(*cur) {
         case '&':
             in_data = 0;
-            switch(c) {
-            case 'c': *cert_len = chunk; break;
-            case 'd': *data_len = chunk; break;
-            case 's': *sign_len = chunk; break;
+            if(c == q) {
+                *ret_len = chunk;
             }
             c = '\0';
             break;
@@ -377,31 +364,34 @@ int parse_args(const unsigned char *buf, const size_t blen,
                 chunk = -1;
             }
             break;
-        case 'c':
-        case 'd':
-        case 's':
+        default:
             if(in_data==0) {
                 c = *cur;
             }
         }
 
-        if(chunk == 0) {
-        switch(c) {
-        case 'c': *cert = cur; break;
-        case 'd': *data = cur; break;
-        case 's': *sign = cur; break;
-
-        }
+        if(chunk == 0 && c == q) {
+            *ret = cur;
         }
 
         chunk++;
         cur++;
     }
-    switch(c) {
-        case 'c': *cert_len = chunk; break;
-        case 'd': *data_len = chunk; break;
-        case 's': *sign_len = chunk; break;
+
+    if(c == q) {
+        *ret_len = chunk;
     }
+}
+
+int parse_args(const unsigned char *buf, const size_t blen,
+               char **cert, int *cert_len,
+               char **data, int *data_len,
+               char **sign, int *sign_len)
+{
+    int err;
+    parse_q_arg(buf, blen, 'c', cert, cert_len);
+    parse_q_arg(buf, blen, 'd', data, data_len);
+    parse_q_arg(buf, blen, 's', sign, sign_len);
 
     if(*cert && *cert_len && *data && *data_len && *sign && *sign_len) {
         err = 0;
@@ -465,6 +455,104 @@ send_err:
     return 1;
 }
 
+int pubverify_handle(const unsigned char *buf, const size_t blen,
+                  unsigned char **ret, size_t *rlen)
+{
+    int err, pub_len = 0, hash_len = 0, sign_len = 0;
+    uint8_t *pub = NULL, *hash = NULL, *raw_sign = NULL;
+    char *pubhex = NULL, *hashhex = NULL, *sign = NULL;
+
+    ASN1_STRING *asnpub;
+    EC_GROUP* ec_group = NULL;
+    EC_POINT* qpoint = NULL;
+    DSTU_KEY *dstu = NULL;
+    EVP_PKEY *evp = NULL;
+    EVP_PKEY_CTX *pkey_ctx = NULL;
+
+    parse_q_arg(buf, blen, 'p', &pubhex, &pub_len);
+    parse_q_arg(buf, blen, 'h', &hashhex, &hash_len);
+    parse_q_arg(buf, blen, 's', &sign, &sign_len);
+
+    if(!pubhex || !hashhex || !sign || !pub_len || hash_len != 64 || !sign_len) {
+        return 400;
+    }
+
+    ec_group = group_from_nid(NID_uacurve6);
+
+    qpoint = EC_POINT_new(ec_group);
+    if(!qpoint) {
+        goto err;
+    }
+
+    asnpub = ASN1_STRING_new();
+    if(!asnpub) {
+        goto err;
+    }
+
+    dstu = DSTU_KEY_new();
+    if(!dstu) {
+        goto err;
+    }
+    err = EC_KEY_set_group(dstu->ec, ec_group);
+    if(err != 1) {
+        goto err;
+    }
+
+    pub = from_hexb(pubhex, pub_len);
+    pub_len /= 2;
+    err = dstu_point_expand(pub, pub_len, ec_group, qpoint);
+    if(err != 1) {
+        goto err;
+    }
+
+    err = EC_KEY_set_public_key(dstu->ec, qpoint);
+    if(err != 1) {
+        goto err;
+    }
+
+    evp = EVP_PKEY_new();
+    if(!evp) {
+        goto err;
+    }
+
+    err = EVP_PKEY_assign(evp, NID_dstu4145le, dstu);
+    if(err != 1) {
+        goto err;
+    }
+
+    pkey_ctx = EVP_PKEY_CTX_new(evp, NULL);
+    if(err != 1) {
+        goto err;
+    }
+
+    err = EVP_PKEY_verify_init(pkey_ctx);
+    if(err != 1) {
+        goto err;
+    }
+
+    hash = from_hexb(hashhex, hash_len);
+    hash_len /= 2;
+    sign_len = b64_decode((uint8_t*)sign, sign_len, &raw_sign);
+    err = EVP_PKEY_verify(pkey_ctx, raw_sign, sign_len, hash, hash_len);
+    if(err==1) {
+        *ret = malloc(sizeof(1));
+        *ret[0] = 'Y';
+        *rlen=1;
+        err = 0;
+        goto out;
+    }
+err:
+    err = 403;
+out:
+    if(pub) free(pub);
+    if(hash) free(hash);
+    if(raw_sign) free(raw_sign);
+    if(asnpub) ASN1_STRING_free(asnpub);
+    if(evp) EVP_PKEY_free(evp);
+    if(pkey_ctx) EVP_PKEY_CTX_free(pkey_ctx);
+    return err;
+}
+
 int x509_handle(const unsigned char *buf, const size_t blen,
                   unsigned char **ret, size_t *rlen)
 {
@@ -503,6 +591,8 @@ int app_handle(enum app_cmd cmd, const unsigned char *buf, const size_t blen,
         return verify_handle(buf, blen, ret, rlen);
     case CMD_X509:
         return x509_handle(buf, blen, ret, rlen);
+    case CMD_PUBVERIFY:
+        return pubverify_handle(buf, blen, ret, rlen);
     default:
         printf("def ret cmd %x\n", cmd);
         return 404;

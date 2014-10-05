@@ -3,6 +3,7 @@
 
 enum app_cmd {
     CMD_VERIFY = 0x452,
+    CMD_PUBVERIFY = 0x678,
     CMD_X509 = 0x250
 };
 
